@@ -15,8 +15,11 @@
  */
 package com.google.android.gms.fit.samples.stepcounter;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -44,6 +47,8 @@ import com.google.android.gms.fitness.data.Field;
 import com.google.android.gms.fitness.data.Session;
 import com.google.android.gms.fitness.request.SessionReadRequest;
 import com.google.android.gms.fitness.result.SessionReadResponse;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -58,8 +63,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static java.text.DateFormat.getDateInstance;
-
 
 /**
  * This sample demonstrates combining the Recording API and History API of the Google Fit platform
@@ -67,14 +70,6 @@ import static java.text.DateFormat.getDateInstance;
  * authenticate a user with Google Play Services.
  */
 public class MainActivity extends AppCompatActivity {
-    //    protected LocationManager locationManager;
-//    protected LocationListener locationListener;
-//    protected Context context;
-//    TextView txtLat;
-//    String lat;
-//    String provider;
-//    protected String latitude, longitude;
-//    protected boolean gps_enabled, network_enabled;
     public static final String TAG = "StepCounter";
     private static final int REQUEST_OAUTH_REQUEST_CODE = 0x1001;
 
@@ -85,20 +80,6 @@ public class MainActivity extends AppCompatActivity {
         // This method sets up our custom logger, which will print all log messages to the device
         // screen, as well as to adb logcat.
         initializeLogging();
-//        TextView sleepBox = (TextView) findViewById(R.id.sleep);
-
-//        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-//        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-//            // TODO: Consider calling
-//            //    ActivityCompat#requestPermissions
-//            // here to request the missing permissions, and then overriding
-//            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-//            //                                          int[] grantResults)
-//            // to handle the case where the user grants the permission. See the documentation
-//            // for ActivityCompat#requestPermissions for more details.
-//            return;
-//        }
-//        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
 
         FitnessOptions fitnessOptions =
                 FitnessOptions.builder()
@@ -130,6 +111,38 @@ public class MainActivity extends AppCompatActivity {
 //                sendRequest();
             }
         });
+
+        // Get Location
+
+        FusedLocationProviderClient fusedLocationClient;
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_DENIED) {
+
+            Log.d("permission", "permission denied to Check Location - requesting it");
+            String[] permissions = {Manifest.permission.ACCESS_FINE_LOCATION};
+
+            requestPermissions(permissions, REQUEST_OAUTH_REQUEST_CODE);
+
+        }
+
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        // Got last known location. In some rare situations this can be null.
+                        if (location != null) {
+                            Log.i(TAG, "Current Latitude:" + location.getLatitude());
+                        }
+                    }
+                });
+
+        // End Location
+
+        // Get Heart Rate
+//        SensorEventListener sensorEventListener = new SensorEventListener();
     }
 
     @Override
@@ -203,7 +216,7 @@ public class MainActivity extends AppCompatActivity {
                                 sleepTime[0] = session.getEndTime(TimeUnit.MINUTES) - session.getStartTime(TimeUnit.MINUTES);
 //                                TextView sleepBox = findViewById(R.id.sleep);
 //                                sleepBox.setText(String.valueOf(sleepTime[0]));
-                                Log.i(TAG, "Total Sleep Time" + String.valueOf(sleepTime[0]) + "Minutes");
+                                Log.i(TAG, "Total Sleep Time" + sleepTime[0] + "Minutes");
                             }
                         }
                     }
@@ -214,11 +227,11 @@ public class MainActivity extends AppCompatActivity {
                         Log.i(TAG, "Failed to read session");
                     }
                 });
-        try {
-            TimeUnit.SECONDS.sleep(5);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            TimeUnit.SECONDS.sleep(5);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         return sleepTime[0];
         // [END read_session]
     }
@@ -257,24 +270,6 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-//        JsonArrayRequest putRequest = new JsonArrayRequest(Request.Method.GET, url, null,
-//                new Response.Listener<JSONArray>()
-//                {
-//                    @Override
-//                    public void onResponse(JSONArray response) {
-//                        // display response
-//                        Log.i(TAG, response.toString());
-//                    }
-//                },
-//                new Response.ErrorListener()
-//                {
-//                    @Override
-//                    public void onErrorResponse(VolleyError error) {
-//                        Log.w(TAG, error.toString());
-//                    }
-//                }
-//        );
-
 // Add the request to the RequestQueue.
         queue.add(putRequest);
     }
@@ -297,7 +292,7 @@ public class MainActivity extends AppCompatActivity {
                                                 : dataSet.getDataPoints().get(0).getValue(Field.FIELD_STEPS).asInt();
 //                                steps[0] = total;
                                 Log.i(TAG, "Total no of steps: " + total);
-                                TextView stepsBox = (TextView) findViewById(R.id.steps);
+                                TextView stepsBox = findViewById(R.id.steps);
                                 stepsBox.setText(String.valueOf(total));
                             }
                         })
@@ -349,25 +344,4 @@ public class MainActivity extends AppCompatActivity {
 //        msgFilter.setNext(logView);
         Log.i(TAG, "Ready");
     }
-
-//    @Override
-//    public void onLocationChanged(Location location) {
-//
-//        Log.i(TAG, "Current Location: Latitude" + location.getLatitude() + "Longitude" + location.getLongitude());
-//    }
-//
-//    @Override
-//    public void onStatusChanged(String s, int i, Bundle bundle) {
-//
-//    }
-//
-//    @Override
-//    public void onProviderEnabled(String s) {
-//
-//    }
-//
-//    @Override
-//    public void onProviderDisabled(String s) {
-//
-//    }
 }

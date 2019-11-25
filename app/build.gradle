@@ -22,20 +22,15 @@ android {
 dependencies {
     // Note, specific version numbers are managed in gradle.properties. This is preferred since it
     // easily keeps sub-projects on the same versions.
+    // google_play_services_library=11.6.0
     //google_support_library=26.1.0
     implementation "com.google.android.gms:play-services-fitness:11.6.0"
     implementation "com.google.android.gms:play-services-auth:11.6.0"
     implementation "com.android.support:appcompat-v7:26.1.0"
     implementation "com.android.support:design:26.1.0"
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-//    implementation 'com.squareup.retrofit2:retrofit:2.6.2'
-//    implementation 'com.google.code.gson:gson:2.8.6'
-//    implementation 'com.squareup.retrofit2:converter-gson:2.6.2'
-//    implementation 'io.reactivex.rxjava2:rxandroid:2.0.2'
-//    implementation 'io.reactivex.rxjava2:rxjava:2.1.13'
-//    implementation 'com.squareup.retrofit2:adapter-rxjava2:2.4.0'
     implementation 'com.android.volley:volley:1.1.1'
     implementation 'com.android.support.constraint:constraint-layout:1.1.3'
-    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.0.2'
-    implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.0.2'
+//    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.0.2'
+//    implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.0.2'
 }
