@@ -1,13 +1,13 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdkVersion 26
+    compileSdkVersion 29
     buildToolsVersion '28.0.3'
 
     defaultConfig {
-        applicationId "com.google.android.gms.fit.samples.stepcounter"
+        applicationId "com.mohammadrafee.healthcare.continuous"
         minSdkVersion 23
-        targetSdkVersion 26
+        targetSdkVersion 29
         versionCode 2
         versionName "1.1"
     }
@@ -24,13 +24,14 @@ dependencies {
     // easily keeps sub-projects on the same versions.
     // google_play_services_library=11.6.0
     //google_support_library=26.1.0
-    implementation "com.google.android.gms:play-services-fitness:11.6.0"
-    implementation "com.google.android.gms:play-services-auth:11.6.0"
-    implementation "com.android.support:appcompat-v7:26.1.0"
-    implementation "com.android.support:design:26.1.0"
+    implementation 'com.google.android.gms:play-services-fitness:18.0.0'
+    implementation 'com.google.android.gms:play-services-auth:17.0.0'
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'com.google.android.material:material:1.0.0'
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'com.android.volley:volley:1.1.1'
-    implementation 'com.android.support.constraint:constraint-layout:1.1.3'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'com.google.android.gms:play-services-location:17.0.0'
 //    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.0.2'
 //    implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.0.2'
 }
