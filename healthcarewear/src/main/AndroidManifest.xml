@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.mmohammadrafee.healthcare.healthcarewear">
+    package="com.mohammadrafee.healthcare.healthcarewear">
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <uses-feature android:name="android.hardware.type.watch" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
 
     <application
         android:allowBackup="true"
@@ -25,7 +26,7 @@
             android:value="true" />
 
         <activity
-            android:name=".MainActivity"
+            android:name="com.mohammadrafee.healthcare.healthcarewear.MainActivityWear"
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
