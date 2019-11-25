@@ -51,6 +51,7 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.mohammadrafee.healthcare.common.logger.Log;
 import com.mohammadrafee.healthcare.common.logger.LogWrapper;
 import com.mohammadrafee.healthcare.common.logger.MessageOnlyLogFilter;
@@ -62,6 +63,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 
@@ -73,6 +75,7 @@ import java.util.concurrent.TimeUnit;
 public class MainActivityMobile extends AppCompatActivity {
     public static final String TAG = "StepCounter";
     private static final int REQUEST_OAUTH_REQUEST_CODE = 0x1001;
+    private static final String START_ACTIVITY_PATH = "/start-activity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,6 +112,21 @@ public class MainActivityMobile extends AppCompatActivity {
                 TextView sleepBox = findViewById(R.id.sleep);
                 sleepBox.setText(String.valueOf(sleepTime));
                 readData();
+                Task<Integer> sendMessageTask =
+                        Wearable.getMessageClient(this).sendMessage("Sample Message", START_ACTIVITY_PATH, new byte[0]);
+
+                try {
+                    // Block on a task and get the result synchronously (because this is on a background
+                    // thread).
+                    Integer result = Tasks.await(sendMessageTask);
+                    Log.d(TAG, "Message sent: " + result);
+
+                } catch (ExecutionException exception) {
+                    Log.e(TAG, "Task failed: " + exception);
+
+                } catch (InterruptedException exception) {
+                    Log.e(TAG, "Interrupt occurred: " + exception);
+                }
 //                sendRequest();
             }
         });
