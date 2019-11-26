@@ -137,68 +137,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
         // End Location
 
         // Get Heart Rate
-//        Fitness.getSensorsClient(this, GoogleSignIn.getLastSignedInAccount(this))
-//                .findDataSources(
-//                        new DataSourcesRequest.Builder()
-//                                .setDataTypes(DataType.TYPE_HEART_RATE_BPM)
-//                                .setDataSourceTypes(DataSource.TYPE_RAW)
-//                                .build())
-//                .addOnSuccessListener(
-//                        new OnSuccessListener<List<DataSource>>() {
-//                            @Override
-//                            public void onSuccess(List<DataSource> dataSources) {
-//                                for (DataSource dataSource : dataSources) {
-//                                    Log.i(TAG, "Data source found: " + dataSource.toString());
-//                                    Log.i(TAG, "Data Source type: " + dataSource.getDataType().getName());
-//
-//                                    // Let's register a listener to receive Activity data!
-//                                    if (dataSource.getDataType().equals(DataType.TYPE_HEART_RATE_BPM)
-//                                            && mListener == null) {
-//                                        Log.i(TAG, "Data source for LOCATION_SAMPLE found!  Registering.");
-////                                        registerFitnessDataListener(dataSource, DataType.TYPE_HEART_RATE_BPM);
-//                                    }
-//                                }
-//                            }
-//                        })
-//                .addOnFailureListener(
-//                        new OnFailureListener() {
-//                            @Override
-//                            public void onFailure(@NonNull Exception e) {
-//                                Log.e(TAG, "failed", e);
-//                            }
-//                        });
-//        mListener =
-//                new OnDataPointListener() {
-//                    @Override
-//                    public void onDataPoint(DataPoint dataPoint) {
-//                        for (Field field : dataPoint.getDataType().getFields()) {
-//                            Value val = dataPoint.getValue(field);
-//                            Log.i(TAG, "Detected DataPoint field: " + field.getName());
-//                            Log.i(TAG, "Detected DataPoint value: " + val);
-//                        }
-//                    }
-//                };
-//
-//        Fitness.getSensorsClient(this, GoogleSignIn.getLastSignedInAccount(this))
-//                .add(
-//                        new SensorRequest.Builder()
-//                                .setDataSource(dataSource) // Optional but recommended for custom data sets.
-//                                .setDataType(dataType) // Can't be omitted.
-//                                .setSamplingRate(10, TimeUnit.SECONDS)
-//                                .build(),
-//                        mListener)
-//                .addOnCompleteListener(
-//                        new OnCompleteListener<Void>() {
-//                            @Override
-//                            public void onComplete(@NonNull Task<Void> task) {
-//                                if (task.isSuccessful()) {
-//                                    Log.i(TAG, "Listener registered!");
-//                                } else {
-//                                    Log.e(TAG, "Listener not registered.", task.getException());
-//                                }
-//                            }
-//                        });
-//        SensorEventListener sensorEventListener = new SensorEventListener();
         getMessageClient(this).addListener(this);
     }
 
@@ -456,67 +394,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                         });
     }
 
-    private long readSession() {
-        // Begin by creating the query.
-        Calendar cal = Calendar.getInstance();
-        Date now = new Date();
-        cal.setTime(now);
-        long endTime = cal.getTimeInMillis();
-        cal.add(Calendar.DAY_OF_MONTH, -1);
-        long startTime = cal.getTimeInMillis();
-        final long[] sleepTime = new long[1];
-
-        final java.text.DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-        Log.i(TAG, "Range Start: " + dateFormat.format(startTime));
-        Log.i(TAG, "Range End: " + dateFormat.format(endTime));
-        // Getting Sleep Data
-        final SessionReadRequest.Builder sessionBuilder = new SessionReadRequest.Builder()
-                .setTimeInterval(startTime, endTime, TimeUnit.MILLISECONDS)
-                .read(DataType.TYPE_ACTIVITY_SEGMENT)
-                .readSessionsFromAllApps()
-                .enableServerQueries();
-
-        final SessionReadRequest readRequest = sessionBuilder.build();
-        Fitness.getSessionsClient(this, GoogleSignIn.getLastSignedInAccount(this))
-                .readSession(readRequest)
-                .addOnSuccessListener(new OnSuccessListener<SessionReadResponse>() {
-                    @Override
-                    public void onSuccess(SessionReadResponse sessionReadResponse) {
-                        // Get a list of the sessions that match the criteria to check the result.
-                        List<Session> sessions = sessionReadResponse.getSessions();
-                        Log.i(TAG, "Session read was successful. Number of returned sessions is: "
-                                + sessions.size());
-
-                        for (Session session : sessions) {
-                            // Process the session
-                            if (session.getName().equals("Sleep")) {
-//                                long startTime = ;
-                                Log.i(TAG, "Time to start sleep" + dateFormat.format(session.getStartTime(TimeUnit.MILLISECONDS)));
-                                Log.i(TAG, "Time to end sleep" + dateFormat.format(session.getEndTime(TimeUnit.MILLISECONDS)));
-//                                Log.i(TAG, session.toString());
-                                sleepTime[0] = session.getEndTime(TimeUnit.MINUTES) - session.getStartTime(TimeUnit.MINUTES);
-//                                TextView sleepBox = findViewById(R.id.sleep);
-//                                sleepBox.setText(String.valueOf(sleepTime[0]));
-                                Log.i(TAG, "Total Sleep Time" + sleepTime[0] + "Minutes");
-                            }
-                        }
-                    }
-                })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.i(TAG, "Failed to read session");
-                    }
-                });
-//        try {
-//            TimeUnit.SECONDS.sleep(5);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-        return sleepTime[0];
-        // [END read_session]
-    }
-
     private void postRequest(String url, JSONObject jsonObject) {
         // Instantiate the RequestQueue.
         RequestQueue queue = Volley.newRequestQueue(this);
@@ -564,32 +441,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
      * Reads the current daily step total, computed from midnight of the current day on the device's
      * current timezone.
      */
-    private void readData() {
-        final long[] steps = new long[1];
-        Fitness.getHistoryClient(this, GoogleSignIn.getLastSignedInAccount(this))
-                .readDailyTotal(DataType.TYPE_STEP_COUNT_DELTA)
-                .addOnSuccessListener(
-                        new OnSuccessListener<DataSet>() {
-                            @Override
-                            public void onSuccess(DataSet dataSet) {
-                                long total =
-                                        dataSet.isEmpty()
-                                                ? 0
-                                                : dataSet.getDataPoints().get(0).getValue(Field.FIELD_STEPS).asInt();
-//                                steps[0] = total;
-                                Log.i(TAG, "Total no of steps: " + total);
-                                TextView stepsBox = findViewById(R.id.steps);
-                                stepsBox.setText(String.valueOf(total));
-                            }
-                        })
-                .addOnFailureListener(
-                        new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.w(TAG, "There was a problem getting the step count.", e);
-                            }
-                        });
-    }
 
     public class HeartRate {
         int heartRate;
