@@ -20,14 +20,15 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.WorkerThread;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.android.volley.Request;
@@ -52,6 +53,10 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.android.gms.wearable.MessageClient;
+import com.google.android.gms.wearable.MessageEvent;
+import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.Wearable;
 import com.mohammadrafee.healthcare.common.logger.Log;
 import com.mohammadrafee.healthcare.common.logger.LogWrapper;
 import com.mohammadrafee.healthcare.common.logger.MessageOnlyLogFilter;
@@ -59,9 +64,12 @@ import com.mohammadrafee.healthcare.common.logger.MessageOnlyLogFilter;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -72,10 +80,11 @@ import java.util.concurrent.TimeUnit;
  * to record steps, and display the daily current step count. It also demonstrates how to
  * authenticate a user with Google Play Services.
  */
-public class MainActivityMobile extends AppCompatActivity {
+public class MainActivityMobile extends AppCompatActivity implements MessageClient.OnMessageReceivedListener {
     public static final String TAG = "StepCounter";
     private static final int REQUEST_OAUTH_REQUEST_CODE = 0x1001;
     private static final String START_ACTIVITY_PATH = "/start-activity";
+    FusedLocationProviderClient fusedLocationClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,6 +99,7 @@ public class MainActivityMobile extends AppCompatActivity {
                         .addDataType(DataType.TYPE_STEP_COUNT_CUMULATIVE)
                         .addDataType(DataType.TYPE_STEP_COUNT_DELTA)
                         .addDataType(DataType.TYPE_ACTIVITY_SEGMENT)
+//                        .addDataType(DataType.TYPE_HEART_RATE_BPM)
                         .build();
 
         if (!GoogleSignIn.hasPermissions(GoogleSignIn.getLastSignedInAccount(this), fitnessOptions)) {
@@ -100,40 +110,12 @@ public class MainActivityMobile extends AppCompatActivity {
                     fitnessOptions);
         } else {
             subscribe();
-            long sleepTime = readSession();
-            sendRequest("5dcb7f0072c6150d68c07a59", 16599, (float) 7.5);
+//            long sleepTime = readSession();
+//            sendRequest("5dcb7f0072c6150d68c07a59", 16599, (float) 7.5);
         }
-
-        Button sync = findViewById(R.id.sync);
-        sync.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                long sleepTime = readSession();
-                TextView sleepBox = findViewById(R.id.sleep);
-                sleepBox.setText(String.valueOf(sleepTime));
-                readData();
-                Task<Integer> sendMessageTask =
-                        Wearable.getMessageClient(this).sendMessage("Sample Message", START_ACTIVITY_PATH, new byte[0]);
-
-                try {
-                    // Block on a task and get the result synchronously (because this is on a background
-                    // thread).
-                    Integer result = Tasks.await(sendMessageTask);
-                    Log.d(TAG, "Message sent: " + result);
-
-                } catch (ExecutionException exception) {
-                    Log.e(TAG, "Task failed: " + exception);
-
-                } catch (InterruptedException exception) {
-                    Log.e(TAG, "Interrupt occurred: " + exception);
-                }
-//                sendRequest();
-            }
-        });
 
         // Get Location
 
-        FusedLocationProviderClient fusedLocationClient;
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
 
@@ -147,22 +129,219 @@ public class MainActivityMobile extends AppCompatActivity {
 
         }
 
+        // End Location
+
+        // Get Heart Rate
+//        SensorEventListener sensorEventListener = new SensorEventListener();
+    }
+
+    public void onEmergencyClick(View view) {
+        JSONObject postObject = new JSONObject();
+        final JSONObject locationObject = new JSONObject();
         fusedLocationClient.getLastLocation()
                 .addOnSuccessListener(this, new OnSuccessListener<Location>() {
                     @Override
                     public void onSuccess(Location location) {
                         // Got last known location. In some rare situations this can be null.
                         if (location != null) {
+                            try {
+                                locationObject.put("latitude", location.getLatitude());
+                                locationObject.put("longitude", location.getLongitude());
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
                             Log.i(TAG, "Current Latitude:" + location.getLatitude());
                         }
                     }
                 });
 
-        // End Location
+        String id = "5dcb7f0072c6150d68c07a59";
+        final String url = "http://ec2-3-85-74-6.compute-1.amazonaws.com/doctors/emergencies/:patientId";
+        final String name = "Rafee";
+        try {
+            postObject.put("correpond_id", id);
+            postObject.put("locaton", locationObject);
+            postObject.put("heartrate", 76);
+            postObject.put("name", name);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        postRequest(url, postObject);
 
-        // Get Heart Rate
-//        SensorEventListener sensorEventListener = new SensorEventListener();
+//        new StartWearableActivityTask().execute();
+//        final DataReadRequest readRequest = new DataReadRequest.Builder().read(DataType.TYPE_HEART_RATE_BPM).setTimeRange(System.currentTimeMillis()-1000,System.currentTimeMillis(),TimeUnit.MILLISECONDS).build();
+//        Log.d(TAG, "Read from Sensor " + readRequest);
+//        DataReadResult dataReadResult=Fitness.HistoryApi.readData(readRequest).await(3,TimeUnit.SECONDS);
     }
+
+    public void onSyncClick(View view) {
+
+        // Get Sleep Time
+        final TextView sleepBox = findViewById(R.id.sleep);
+        final String url = "https://c7trbjve0a.execute-api.us-east-1.amazonaws.com/v1/datas/steps";
+        final JSONObject jsonObject = new JSONObject();
+        String id = "5dcb7f0072c6150d68c07a59";
+        try {
+            long today = System.currentTimeMillis();
+            jsonObject.put("id", id);
+            jsonObject.put("date", today);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+//        sleepBox.setText(String.valueOf(sleepTime));
+        Calendar cal = Calendar.getInstance();
+        Date now = new Date();
+        cal.setTime(now);
+        long endTime = cal.getTimeInMillis();
+        cal.add(Calendar.DAY_OF_MONTH, -1);
+        long startTime = cal.getTimeInMillis();
+
+        final java.text.DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        Log.i(TAG, "Range Start: " + dateFormat.format(startTime));
+        Log.i(TAG, "Range End: " + dateFormat.format(endTime));
+        // Getting Sleep Data
+        final SessionReadRequest.Builder sessionBuilder = new SessionReadRequest.Builder()
+                .setTimeInterval(startTime, endTime, TimeUnit.MILLISECONDS)
+                .read(DataType.TYPE_ACTIVITY_SEGMENT)
+                .readSessionsFromAllApps()
+                .enableServerQueries();
+
+        final SessionReadRequest readRequest = sessionBuilder.build();
+        Fitness.getSessionsClient(this, GoogleSignIn.getLastSignedInAccount(this))
+                .readSession(readRequest)
+                .addOnSuccessListener(new OnSuccessListener<SessionReadResponse>() {
+                    @Override
+                    public void onSuccess(SessionReadResponse sessionReadResponse) {
+                        // Get a list of the sessions that match the criteria to check the result.
+                        List<Session> sessions = sessionReadResponse.getSessions();
+                        Log.i(TAG, "Session read was successful. Number of returned sessions is: "
+                                + sessions.size());
+
+                        for (Session session : sessions) {
+                            // Process the session
+                            if (session.getName().equals("Sleep")) {
+                                long sleepTime;
+                                DecimalFormat decimalFormat = new DecimalFormat("#.00");
+                                Log.i(TAG, "Time to start sleep" + dateFormat.format(session.getStartTime(TimeUnit.MILLISECONDS)));
+                                Log.i(TAG, "Time to end sleep" + dateFormat.format(session.getEndTime(TimeUnit.MILLISECONDS)));
+                                sleepTime = session.getEndTime(TimeUnit.MINUTES) - session.getStartTime(TimeUnit.MINUTES);
+                                Log.i(TAG, "Total Sleep Time" + sleepTime + "Minutes");
+                                int sleepTimeInHours = (int) (sleepTime / 60);
+                                String sleepTimeAsString = decimalFormat.format(sleepTimeInHours);
+                                sleepBox.setText(sleepTimeAsString);
+                                try {
+                                    jsonObject.put("sleepingHours", sleepTimeInHours);
+                                } catch (JSONException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        }
+
+                        if (sessions.size() == 0) {
+                            try {
+                                jsonObject.put("sleepingHours", 0);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                })
+                .
+
+                        addOnFailureListener(new OnFailureListener() {
+                            @Override
+                            public void onFailure(@NonNull Exception e) {
+                                Log.i(TAG, "Failed to read session");
+                            }
+                        });
+
+        Fitness.getHistoryClient(this, GoogleSignIn.getLastSignedInAccount(this))
+                .
+
+                        readDailyTotal(DataType.TYPE_STEP_COUNT_DELTA)
+                .
+
+                        addOnSuccessListener(
+                                new OnSuccessListener<DataSet>() {
+                                    @Override
+                                    public void onSuccess(DataSet dataSet) {
+                                        long total =
+                                                dataSet.isEmpty()
+                                                        ? 0
+                                                        : dataSet.getDataPoints().get(0).getValue(Field.FIELD_STEPS).asInt();
+//                                steps[0] = total;
+                                        Log.i(TAG, "Total no of steps: " + total);
+                                        TextView stepsBox = findViewById(R.id.steps);
+                                        stepsBox.setText(String.valueOf(total));
+                                        try {
+                                            jsonObject.put("steps", total);
+                                        } catch (JSONException e) {
+                                            e.printStackTrace();
+                                        }
+                                        putRequest(url, jsonObject);
+                                    }
+                                })
+                .
+
+                        addOnFailureListener(
+                                new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception e) {
+                                        Log.w(TAG, "There was a problem getting the step count.", e);
+                                    }
+                                });
+//                sendRequest();
+    }
+
+    @WorkerThread
+    private Collection<String> getNodes() {
+        HashSet<String> results = new HashSet<>();
+
+        Task<List<Node>> nodeListTask =
+                Wearable.getNodeClient(getApplicationContext()).getConnectedNodes();
+
+        try {
+            // Block on a task and get the result synchronously (because this is on a background
+            // thread).
+            List<Node> nodes = Tasks.await(nodeListTask);
+
+            for (Node node : nodes) {
+                results.add(node.getId());
+            }
+
+        } catch (ExecutionException exception) {
+            android.util.Log.e(TAG, "Task failed: " + exception);
+
+        } catch (InterruptedException exception) {
+            android.util.Log.e(TAG, "Interrupt occurred: " + exception);
+        }
+
+        return results;
+    }
+
+    private void putRequest(String url, JSONObject jsonObject) {
+        // Instantiate the RequestQueue.
+        RequestQueue queue = Volley.newRequestQueue(this);
+        JsonObjectRequest putRequest;
+        putRequest = new JsonObjectRequest(Request.Method.PUT, url, jsonObject,
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        // response
+                        Log.i(TAG, response.toString());
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        // error
+                        Log.w(TAG, error.toString());
+                    }
+                }
+        );
+        queue.add(putRequest);
+    }
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -256,6 +435,49 @@ public class MainActivityMobile extends AppCompatActivity {
         // [END read_session]
     }
 
+    private void postRequest(String url, JSONObject jsonObject) {
+        // Instantiate the RequestQueue.
+        RequestQueue queue = Volley.newRequestQueue(this);
+        JsonObjectRequest postRequest;
+        postRequest = new JsonObjectRequest(Request.Method.POST, url, jsonObject,
+                new Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        // response
+                        Log.i(TAG, response.toString());
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        // error
+                        Log.w(TAG, error.toString());
+                    }
+                }
+        );
+        queue.add(postRequest);
+    }
+
+    @WorkerThread
+    private void sendStartActivityMessage(String node) {
+
+        Task<Integer> sendMessageTask =
+                Wearable.getMessageClient(this).sendMessage(node, START_ACTIVITY_PATH, new byte[0]);
+
+        try {
+            // Block on a task and get the result synchronously (because this is on a background
+            // thread).
+            Integer result = Tasks.await(sendMessageTask);
+            Log.d(TAG, "Message sent: " + result);
+
+        } catch (ExecutionException exception) {
+            android.util.Log.e(TAG, "Task failed: " + exception);
+
+        } catch (InterruptedException exception) {
+            android.util.Log.e(TAG, "Interrupt occurred: " + exception);
+        }
+    }
+
     private void sendRequest(String id, long steps, float sleepingHours) {
         // Instantiate the RequestQueue.
         RequestQueue queue = Volley.newRequestQueue(this);
@@ -325,10 +547,32 @@ public class MainActivityMobile extends AppCompatActivity {
     }
 
     @Override
+    public void onMessageReceived(@NonNull MessageEvent messageEvent) {
+        if (messageEvent.getPath().equals(START_ACTIVITY_PATH)) {
+            android.util.Log.d(TAG, "Received Message" + messageEvent.toString());
+//            mTextView.setText(messageEvent.toString());
+        }
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the main; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
+    }
+
+    private class StartWearableActivityTask extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected Void doInBackground(Void... args) {
+            Collection<String> nodes = getNodes();
+            for (String node : nodes) {
+                Log.d(TAG, "Node " + node);
+                sendStartActivityMessage(node);
+            }
+            return null;
+        }
+
     }
 
     @Override
