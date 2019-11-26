@@ -22,8 +22,6 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
@@ -40,10 +38,12 @@ import com.android.volley.toolbox.Volley;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.fitness.Fitness;
 import com.google.android.gms.fitness.FitnessOptions;
+import com.google.android.gms.fitness.SensorsClient;
 import com.google.android.gms.fitness.data.DataSet;
 import com.google.android.gms.fitness.data.DataType;
 import com.google.android.gms.fitness.data.Field;
 import com.google.android.gms.fitness.data.Session;
+import com.google.android.gms.fitness.request.OnDataPointListener;
 import com.google.android.gms.fitness.request.SessionReadRequest;
 import com.google.android.gms.fitness.result.SessionReadResponse;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -64,6 +64,7 @@ import com.mohammadrafee.healthcare.common.logger.MessageOnlyLogFilter;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.nio.ByteBuffer;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -74,6 +75,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import static com.google.android.gms.wearable.Wearable.getMessageClient;
+
 
 /**
  * This sample demonstrates combining the Recording API and History API of the Google Fit platform
@@ -81,10 +84,14 @@ import java.util.concurrent.TimeUnit;
  * authenticate a user with Google Play Services.
  */
 public class MainActivityMobile extends AppCompatActivity implements MessageClient.OnMessageReceivedListener {
+
+    HeartRate heartRate = new HeartRate();
+    SensorsClient sensorsClient;
     public static final String TAG = "StepCounter";
     private static final int REQUEST_OAUTH_REQUEST_CODE = 0x1001;
     private static final String START_ACTIVITY_PATH = "/start-activity";
     FusedLocationProviderClient fusedLocationClient;
+    private OnDataPointListener mListener = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -99,7 +106,7 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                         .addDataType(DataType.TYPE_STEP_COUNT_CUMULATIVE)
                         .addDataType(DataType.TYPE_STEP_COUNT_DELTA)
                         .addDataType(DataType.TYPE_ACTIVITY_SEGMENT)
-//                        .addDataType(DataType.TYPE_HEART_RATE_BPM)
+                        .addDataType(DataType.TYPE_HEART_RATE_BPM)
                         .build();
 
         if (!GoogleSignIn.hasPermissions(GoogleSignIn.getLastSignedInAccount(this), fitnessOptions)) {
@@ -110,8 +117,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                     fitnessOptions);
         } else {
             subscribe();
-//            long sleepTime = readSession();
-//            sendRequest("5dcb7f0072c6150d68c07a59", 16599, (float) 7.5);
         }
 
         // Get Location
@@ -132,10 +137,78 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
         // End Location
 
         // Get Heart Rate
+//        Fitness.getSensorsClient(this, GoogleSignIn.getLastSignedInAccount(this))
+//                .findDataSources(
+//                        new DataSourcesRequest.Builder()
+//                                .setDataTypes(DataType.TYPE_HEART_RATE_BPM)
+//                                .setDataSourceTypes(DataSource.TYPE_RAW)
+//                                .build())
+//                .addOnSuccessListener(
+//                        new OnSuccessListener<List<DataSource>>() {
+//                            @Override
+//                            public void onSuccess(List<DataSource> dataSources) {
+//                                for (DataSource dataSource : dataSources) {
+//                                    Log.i(TAG, "Data source found: " + dataSource.toString());
+//                                    Log.i(TAG, "Data Source type: " + dataSource.getDataType().getName());
+//
+//                                    // Let's register a listener to receive Activity data!
+//                                    if (dataSource.getDataType().equals(DataType.TYPE_HEART_RATE_BPM)
+//                                            && mListener == null) {
+//                                        Log.i(TAG, "Data source for LOCATION_SAMPLE found!  Registering.");
+////                                        registerFitnessDataListener(dataSource, DataType.TYPE_HEART_RATE_BPM);
+//                                    }
+//                                }
+//                            }
+//                        })
+//                .addOnFailureListener(
+//                        new OnFailureListener() {
+//                            @Override
+//                            public void onFailure(@NonNull Exception e) {
+//                                Log.e(TAG, "failed", e);
+//                            }
+//                        });
+//        mListener =
+//                new OnDataPointListener() {
+//                    @Override
+//                    public void onDataPoint(DataPoint dataPoint) {
+//                        for (Field field : dataPoint.getDataType().getFields()) {
+//                            Value val = dataPoint.getValue(field);
+//                            Log.i(TAG, "Detected DataPoint field: " + field.getName());
+//                            Log.i(TAG, "Detected DataPoint value: " + val);
+//                        }
+//                    }
+//                };
+//
+//        Fitness.getSensorsClient(this, GoogleSignIn.getLastSignedInAccount(this))
+//                .add(
+//                        new SensorRequest.Builder()
+//                                .setDataSource(dataSource) // Optional but recommended for custom data sets.
+//                                .setDataType(dataType) // Can't be omitted.
+//                                .setSamplingRate(10, TimeUnit.SECONDS)
+//                                .build(),
+//                        mListener)
+//                .addOnCompleteListener(
+//                        new OnCompleteListener<Void>() {
+//                            @Override
+//                            public void onComplete(@NonNull Task<Void> task) {
+//                                if (task.isSuccessful()) {
+//                                    Log.i(TAG, "Listener registered!");
+//                                } else {
+//                                    Log.e(TAG, "Listener not registered.", task.getException());
+//                                }
+//                            }
+//                        });
 //        SensorEventListener sensorEventListener = new SensorEventListener();
+        getMessageClient(this).addListener(this);
     }
 
     public void onEmergencyClick(View view) {
+        new StartWearableActivityTask().execute();
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         JSONObject postObject = new JSONObject();
         final JSONObject locationObject = new JSONObject();
         fusedLocationClient.getLastLocation()
@@ -161,17 +234,26 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
         try {
             postObject.put("correpond_id", id);
             postObject.put("locaton", locationObject);
-            postObject.put("heartrate", 76);
+            postObject.put("heartrate", heartRate.getHeartRate());
             postObject.put("name", name);
         } catch (JSONException e) {
             e.printStackTrace();
         }
         postRequest(url, postObject);
 
-//        new StartWearableActivityTask().execute();
 //        final DataReadRequest readRequest = new DataReadRequest.Builder().read(DataType.TYPE_HEART_RATE_BPM).setTimeRange(System.currentTimeMillis()-1000,System.currentTimeMillis(),TimeUnit.MILLISECONDS).build();
 //        Log.d(TAG, "Read from Sensor " + readRequest);
 //        DataReadResult dataReadResult=Fitness.HistoryApi.readData(readRequest).await(3,TimeUnit.SECONDS);
+    }
+
+    @Override
+    public void onMessageReceived(@NonNull MessageEvent messageEvent) {
+        if (messageEvent.getPath().equals(START_ACTIVITY_PATH)) {
+            Log.d(TAG, "Received Message" + messageEvent.toString());
+            Log.d(TAG, String.valueOf(ByteBuffer.wrap(messageEvent.getData()).getInt()));
+            heartRate.setHeartRate(ByteBuffer.wrap(messageEvent.getData()).getInt());
+//            mTextView.setText(messageEvent.toString());
+        }
     }
 
     public void onSyncClick(View view) {
@@ -478,43 +560,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
         }
     }
 
-    private void sendRequest(String id, long steps, float sleepingHours) {
-        // Instantiate the RequestQueue.
-        RequestQueue queue = Volley.newRequestQueue(this);
-        String url = "https://c7trbjve0a.execute-api.us-east-1.amazonaws.com/v1/datas/steps";
-
-        final JSONObject jsonObject = new JSONObject();
-        try {
-            long today = System.currentTimeMillis();
-            jsonObject.put("id", id);
-            jsonObject.put("date", today);
-            jsonObject.put("steps", steps);
-            jsonObject.put("sleepingHours", sleepingHours);
-        } catch (JSONException e) {
-            // handle exception
-        }
-        JsonObjectRequest putRequest;
-        putRequest = new JsonObjectRequest(Request.Method.PUT, url, jsonObject,
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        // response
-                        Log.i(TAG, response.toString());
-                    }
-                },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        // error
-                        Log.w(TAG, error.toString());
-                    }
-                }
-        );
-
-// Add the request to the RequestQueue.
-        queue.add(putRequest);
-    }
-
     /**
      * Reads the current daily step total, computed from midnight of the current day on the device's
      * current timezone.
@@ -546,19 +591,16 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                         });
     }
 
-    @Override
-    public void onMessageReceived(@NonNull MessageEvent messageEvent) {
-        if (messageEvent.getPath().equals(START_ACTIVITY_PATH)) {
-            android.util.Log.d(TAG, "Received Message" + messageEvent.toString());
-//            mTextView.setText(messageEvent.toString());
-        }
-    }
+    public class HeartRate {
+        int heartRate;
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the main; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.main, menu);
-        return true;
+        public int getHeartRate() {
+            return heartRate;
+        }
+
+        public void setHeartRate(int heartRate) {
+            this.heartRate = heartRate;
+        }
     }
 
     private class StartWearableActivityTask extends AsyncTask<Void, Void, Void> {
@@ -575,15 +617,22 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
 
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == R.id.action_read_data) {
-            readData();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
+//    @Override
+//    public boolean onCreateOptionsMenu(Menu menu) {
+//        // Inflate the main; this adds items to the action bar if it is present.
+//        getMenuInflater().inflate(R.menu.main, menu);
+//        return true;
+//    }
+//
+//    @Override
+//    public boolean onOptionsItemSelected(MenuItem item) {
+//        int id = item.getItemId();
+//        if (id == R.id.action_read_data) {
+//            readData();
+//            return true;
+//        }
+//        return super.onOptionsItemSelected(item);
+//    }
 
     /**
      * Initializes a custom log class that outputs both to in-app targets and logcat.

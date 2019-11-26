@@ -1,5 +1,9 @@
 package com.mohammadrafee.healthcare.healthcarewear;
 
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.wearable.activity.WearableActivity;
@@ -15,6 +19,7 @@ import com.google.android.gms.wearable.MessageClient;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 
+import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -25,12 +30,12 @@ import static com.google.android.gms.wearable.Wearable.getNodeClient;
 
 //import com.google.android.gms.wearable.Wearable;
 
-public class MainActivityWear extends WearableActivity implements MessageClient.OnMessageReceivedListener {
+public class MainActivityWear extends WearableActivity implements MessageClient.OnMessageReceivedListener, SensorEventListener {
+
+    HeartRate heartRate = new HeartRate();
 
     String TAG = "Wear";
     private static final String START_ACTIVITY_PATH = "/start-activity";
-    int heartRate;
-    private TextView mTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,29 +43,41 @@ public class MainActivityWear extends WearableActivity implements MessageClient.
         setContentView(R.layout.activity_main_wear);
 
         mTextView = findViewById(R.id.text);
-//        SensorManager mSensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
-//        Sensor mHeartRateSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
-//        mSensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        SensorManager mSensorManager = ((SensorManager) getSystemService(SENSOR_SERVICE));
+        Sensor mHeartRateSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE);
+        mSensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
 
         // Enables Always-on
 //        setAmbientEnabled();
-//        Wearable.getMessageClient(this).addListener(this);
+        getMessageClient(this).addListener(this);
     }
 
-//    @Override
-//    public void onSensorChanged(SensorEvent event) {
-//        if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
-//            String msg = "" + (int) event.values[0];
-//            mTextView.setText(msg);
-//            heartRate = (int) event.values[0];
-//            Log.d(TAG, msg);
-//        }
-//    }
-//
-//    @Override
-//    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-//        Log.d(TAG, "onAccuracyChanged - accuracy: " + accuracy);
-//    }
+    private TextView mTextView;
+
+    //
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
+            String msg = "Heart rate " + (int) event.values[0];
+            mTextView.setText(msg);
+            heartRate.setHeartRate((int) event.values[0]);
+            Log.d(TAG, msg);
+        }
+    }
+
+    @Override
+    public void onMessageReceived(@NonNull MessageEvent messageEvent) {
+        if (messageEvent.getPath().equals(START_ACTIVITY_PATH)) {
+            Log.d(TAG, "Received Message" + messageEvent.toString());
+            new StartWearableActivityTask().execute();
+//            mTextView.setText(messageEvent.toString());
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        Log.d(TAG, "onAccuracyChanged - accuracy: " + accuracy);
+    }
 
     @WorkerThread
     private Collection<String> getNodes() {
@@ -91,8 +108,12 @@ public class MainActivityWear extends WearableActivity implements MessageClient.
     @WorkerThread
     private void sendStartActivityMessage(String node) {
 
+        ByteBuffer b = ByteBuffer.allocate(4);
+        b.putInt(heartRate.getHeartRate());
+        Log.d(TAG, String.valueOf(heartRate.getHeartRate()));
+
         Task<Integer> sendMessageTask =
-                getMessageClient(this).sendMessage(node, START_ACTIVITY_PATH, new byte[]{(byte) heartRate});
+                getMessageClient(this).sendMessage(node, START_ACTIVITY_PATH, b.array());
 
         try {
             // Block on a task and get the result synchronously (because this is on a background
@@ -108,12 +129,15 @@ public class MainActivityWear extends WearableActivity implements MessageClient.
         }
     }
 
-    @Override
-    public void onMessageReceived(@NonNull MessageEvent messageEvent) {
-        if (messageEvent.getPath().equals(START_ACTIVITY_PATH)) {
-            Log.d(TAG, "Received Message" + messageEvent.toString());
-            new StartWearableActivityTask().execute();
-//            mTextView.setText(messageEvent.toString());
+    public class HeartRate {
+        int heartRate;
+
+        public int getHeartRate() {
+            return heartRate;
+        }
+
+        public void setHeartRate(int heartRate) {
+            this.heartRate = heartRate;
         }
     }
 
