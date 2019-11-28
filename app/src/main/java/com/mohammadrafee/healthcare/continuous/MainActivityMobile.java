@@ -106,7 +106,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                         .addDataType(DataType.TYPE_STEP_COUNT_CUMULATIVE)
                         .addDataType(DataType.TYPE_STEP_COUNT_DELTA)
                         .addDataType(DataType.TYPE_ACTIVITY_SEGMENT)
-                        .addDataType(DataType.TYPE_HEART_RATE_BPM)
                         .build();
 
         if (!GoogleSignIn.hasPermissions(GoogleSignIn.getLastSignedInAccount(this), fitnessOptions)) {
@@ -147,8 +146,11 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        JSONObject postObject = new JSONObject();
+        String id = "5dcb7f0072c6150d68c07a59";
+        final String url = "http://healthcare.mohammadrafee.com/doctors/emergencies/" + id;
+        final JSONObject postObject = new JSONObject();
         final JSONObject locationObject = new JSONObject();
+        final String name = "Rafee";
         fusedLocationClient.getLastLocation()
                 .addOnSuccessListener(this, new OnSuccessListener<Location>() {
                     @Override
@@ -158,6 +160,11 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                             try {
                                 locationObject.put("latitude", location.getLatitude());
                                 locationObject.put("longitude", location.getLongitude());
+                                postObject.put("location", locationObject);
+                                postObject.put("heartrate", heartRate.getHeartRate());
+                                postObject.put("name", name);
+                                Log.d(TAG, postObject.toString());
+                                postRequest(url, postObject);
                             } catch (JSONException e) {
                                 e.printStackTrace();
                             }
@@ -165,23 +172,6 @@ public class MainActivityMobile extends AppCompatActivity implements MessageClie
                         }
                     }
                 });
-
-        String id = "5dcb7f0072c6150d68c07a59";
-        final String url = "http://ec2-3-85-74-6.compute-1.amazonaws.com/doctors/emergencies/:patientId";
-        final String name = "Rafee";
-        try {
-            postObject.put("correpond_id", id);
-            postObject.put("locaton", locationObject);
-            postObject.put("heartrate", heartRate.getHeartRate());
-            postObject.put("name", name);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        postRequest(url, postObject);
-
-//        final DataReadRequest readRequest = new DataReadRequest.Builder().read(DataType.TYPE_HEART_RATE_BPM).setTimeRange(System.currentTimeMillis()-1000,System.currentTimeMillis(),TimeUnit.MILLISECONDS).build();
-//        Log.d(TAG, "Read from Sensor " + readRequest);
-//        DataReadResult dataReadResult=Fitness.HistoryApi.readData(readRequest).await(3,TimeUnit.SECONDS);
     }
 
     @Override
